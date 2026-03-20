@@ -9,7 +9,15 @@ while [ -L "$SOURCE" ]; do
 done
 BIN_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 ROOT_DIR="$(cd "$BIN_DIR/.." && pwd)"
-BACKEND_CLI="${BARRY_VIDEO_BACKEND:-$HOME/inbeidou_cli.py}"
+PRIVATE_BACKEND="$ROOT_DIR/backend/inbeidou_cli.py"
+BACKEND_CLI="${BARRY_VIDEO_BACKEND:-$PRIVATE_BACKEND}"
+if [ ! -f "$BACKEND_CLI" ]; then
+  if [ -f "$HOME/inbeidou_cli.py" ]; then
+    BACKEND_CLI="$HOME/inbeidou_cli.py"
+  elif [ -f "/Users/ming/inbeidou_cli.py" ]; then
+    BACKEND_CLI="/Users/ming/inbeidou_cli.py"
+  fi
+fi
 PYTHON_BIN="${BARRY_VIDEO_PYTHON:-python3}"
 
 usage() {

@@ -6,9 +6,10 @@ OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
 EXTENSIONS_DIR="$OPENCLAW_HOME/extensions"
 SKILLS_DIR="$OPENCLAW_HOME/skills"
 PLUGIN_DIR="$EXTENSIONS_DIR/barry-video"
+PLUGIN_BACKEND_DIR="$PLUGIN_DIR/backend"
+PLUGIN_BACKEND="$PLUGIN_BACKEND_DIR/inbeidou_cli.py"
 SKILL_DIR="$SKILLS_DIR/barry-video"
 CONFIG_FILE="$OPENCLAW_HOME/openclaw.json"
-BACKEND_CLI="${BARRY_VIDEO_BACKEND:-$HOME/inbeidou_cli.py}"
 PYTHON_BIN="${BARRY_VIDEO_PYTHON:-python3}"
 DOWNLOAD_DIR="${BARRY_VIDEO_DOWNLOAD_DIR:-$HOME/Desktop}"
 DEFAULT_ACCOUNT_IDS="${BARRY_VIDEO_DEFAULT_ACCOUNT_IDS:-}"
@@ -17,6 +18,30 @@ DEFAULT_PUBLISH_PLATFORM="${BARRY_VIDEO_DEFAULT_PUBLISH_PLATFORM:-FACEBOOK}"
 DEFAULT_DRAMA_PLATFORM="${BARRY_VIDEO_DEFAULT_DRAMA_PLATFORM:-dramabox}"
 DEFAULT_LANGUAGE="${BARRY_VIDEO_DEFAULT_LANGUAGE:-2}"
 DEFAULT_DRAMA_ORDER="${BARRY_VIDEO_DEFAULT_DRAMA_ORDER:-publish_at}"
+SOURCE_BACKEND=""
+CONFIG_BACKEND_CLI=""
+
+expand_home() {
+  local value="$1"
+  if [[ "$value" == "~" ]]; then
+    printf '%s\n' "$HOME"
+    return
+  fi
+  if [[ "$value" == ~/* ]]; then
+    printf '%s/%s\n' "$HOME" "${value#~/}"
+    return
+  fi
+  printf '%s\n' "$value"
+}
+
+for candidate in "${BARRY_VIDEO_BACKEND:-}" "$HOME/inbeidou_cli.py" "/Users/ming/inbeidou_cli.py"; do
+  [ -n "$candidate" ] || continue
+  candidate="$(expand_home "$candidate")"
+  if [ -f "$candidate" ]; then
+    SOURCE_BACKEND="$candidate"
+    break
+  fi
+done
 
 mkdir -p "$EXTENSIONS_DIR" "$SKILLS_DIR"
 
@@ -26,6 +51,19 @@ rsync -a --delete \
   --exclude '*.tgz' \
   "$ROOT_DIR/" "$PLUGIN_DIR/"
 
+mkdir -p "$PLUGIN_BACKEND_DIR"
+if [ -n "$SOURCE_BACKEND" ]; then
+  cp "$SOURCE_BACKEND" "$PLUGIN_BACKEND"
+  chmod 0644 "$PLUGIN_BACKEND"
+  CONFIG_BACKEND_CLI="$PLUGIN_BACKEND"
+else
+  CONFIG_BACKEND_CLI="$PLUGIN_BACKEND"
+  echo "Warning: source inbeidou_cli.py not found during install; expected one of:" >&2
+  echo "  - \$BARRY_VIDEO_BACKEND" >&2
+  echo "  - $HOME/inbeidou_cli.py" >&2
+  echo "  - /Users/ming/inbeidou_cli.py" >&2
+fi
+
 for skill_path in "$ROOT_DIR"/skills/*; do
   [ -d "$skill_path" ] || continue
   skill_name="$(basename "$skill_path")"
@@ -33,7 +71,7 @@ for skill_path in "$ROOT_DIR"/skills/*; do
   cp -R "$skill_path" "$SKILLS_DIR/$skill_name"
 done
 
-python3 - "$CONFIG_FILE" "$PLUGIN_DIR" "$SKILLS_DIR" "$BACKEND_CLI" "$PYTHON_BIN" "$DOWNLOAD_DIR" "$DEFAULT_ACCOUNT_IDS" "$DEFAULT_TEAM_IDS" "$DEFAULT_PUBLISH_PLATFORM" "$DEFAULT_DRAMA_PLATFORM" "$DEFAULT_LANGUAGE" "$DEFAULT_DRAMA_ORDER" <<'PY'
+python3 - "$CONFIG_FILE" "$PLUGIN_DIR" "$SKILLS_DIR" "$CONFIG_BACKEND_CLI" "$PYTHON_BIN" "$DOWNLOAD_DIR" "$DEFAULT_ACCOUNT_IDS" "$DEFAULT_TEAM_IDS" "$DEFAULT_PUBLISH_PLATFORM" "$DEFAULT_DRAMA_PLATFORM" "$DEFAULT_LANGUAGE" "$DEFAULT_DRAMA_ORDER" <<'PY'
 import json
 import pathlib
 import sys
@@ -78,7 +116,7 @@ plugin_entries = plugins.setdefault("entries", {})
 plugin_entry = plugin_entries.setdefault("barry-video", {})
 plugin_entry["enabled"] = True
 plugin_config = plugin_entry.setdefault("config", {})
-plugin_config.setdefault("backendCli", backend_cli)
+plugin_config["backendCli"] = backend_cli
 plugin_config.setdefault("pythonBin", python_bin)
 plugin_config.setdefault("downloadDir", download_dir)
 plugin_config.setdefault("defaultAccountIds", default_account_ids)
@@ -101,3 +139,6 @@ PY
 echo "Installed Barry Video plugin into: $PLUGIN_DIR"
 echo "Installed Barry Video skills into: $SKILLS_DIR"
 echo "Updated OpenClaw config: $CONFIG_FILE"
+if [ -f "$PLUGIN_BACKEND" ]; then
+  echo "Installed Barry Video private backend into: $PLUGIN_BACKEND"
+fi

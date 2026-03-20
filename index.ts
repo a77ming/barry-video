@@ -2,9 +2,12 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const PLUGIN_ID = "barry-video";
 const PLUGIN_NAME = "Barry Video";
+const PLUGIN_ROOT = path.dirname(fileURLToPath(import.meta.url));
+const PRIVATE_BACKEND = path.join(PLUGIN_ROOT, "backend", "inbeidou_cli.py");
 const PLATFORMS = ["TIKTOK", "FACEBOOK", "INSTAGRAM", "YOUTUBE"];
 const CUT_TYPES = ["high_cut", "high_mixed", "golden_three", "golden_clips", "high_pre"];
 const DEDUP_OPTIONS = [
@@ -132,6 +135,7 @@ function resolveBackendCli(api) {
   const candidates = [
     expandHome(process.env.BARRY_VIDEO_BACKEND || ""),
     expandHome(config.backendCli || ""),
+    PRIVATE_BACKEND,
     path.join(os.homedir(), "inbeidou_cli.py"),
     "/Users/ming/inbeidou_cli.py"
   ].filter(Boolean);

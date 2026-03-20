@@ -7,6 +7,10 @@ It packages two layers together:
 - Skills: natural-language routing and workflow guidance under [`skills/`](./skills)
 - Tools: real executable capability registered in [`index.ts`](./index.ts)
 
+## Detailed spec
+
+The full implementation and packaging spec is documented in [`docs/barry-video-spec.md`](./docs/barry-video-spec.md).
+
 ## What this package includes
 
 - Account info
@@ -42,7 +46,7 @@ barry-video/
 2. `package.json` exposes the package as an installable OpenClaw extension.
 3. `index.ts` registers tool-use actions that shell into the working backend at `inbeidou_cli.py`.
 4. `skills/` tells the model when to use which tool based on natural language.
-5. `scripts/install-local.sh` installs the package into `~/.openclaw`.
+5. `scripts/install-local.sh` installs the package into `~/.openclaw` and copies a private backend snapshot into the plugin directory so runtime no longer depends on the original absolute path.
 
 ## Local install
 
