@@ -1,0 +1,6 @@
+{
+  "name": "barry-video",
+  "display_name": "Barry Video",
+  "short_description": "Use Barry's full Inbeidou workflow for account, drama, media, AI editing and publishing",
+  "default_prompt": "Use Barry Video to answer account questions, discover dramas, upload videos, run AI editing, and publish to social accounts."
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Barry Video"
+  short_description: "Barry's all-in-one Inbeidou workflow for account, drama, media and publishing"
+  default_prompt: "Use Barry Video to answer account questions, discover dramas, upload videos, run AI analysis or editing, and publish to a social account."
