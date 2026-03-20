@@ -48,7 +48,7 @@
     "!.git/**"
   ],
   "bin": {
-    "barry-video": "./bin/barry-video"
+    "barry-video": "bin/barry-video"
   },
   "scripts": {
     "install:local": "./scripts/install-local.sh",
