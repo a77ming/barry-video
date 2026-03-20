@@ -46,7 +46,7 @@ barry-video/
 2. `package.json` exposes the package as an installable OpenClaw extension.
 3. `index.ts` registers tool-use actions that shell into the working backend at `inbeidou_cli.py`.
 4. `skills/` tells the model when to use which tool based on natural language.
-5. `scripts/install-local.sh` installs the package into `~/.openclaw` and copies a private backend snapshot into the plugin directory so runtime no longer depends on the original absolute path.
+5. `scripts/install-local.sh` installs the package into `~/.openclaw`, prefers copying a local backend snapshot when available, and otherwise falls back to the bundled backend shipped inside the npm package.
 
 ## Local install
 
@@ -59,9 +59,12 @@ Optional environment variables for install:
 
 ```bash
 export BARRY_VIDEO_BACKEND="$HOME/inbeidou_cli.py"
+export INBEIDOU_TOKEN="your-token"
 export BARRY_VIDEO_DEFAULT_ACCOUNT_IDS="109,108"
 export BARRY_VIDEO_DEFAULT_PUBLISH_PLATFORM="FACEBOOK"
 ```
+
+If you are installing on a different runtime user or machine, set `INBEIDOU_TOKEN` or `BARRY_VIDEO_AUTH_TOKEN` so the bundled backend can authenticate without depending on a local hardcoded script.
 
 ## Smoke test
 

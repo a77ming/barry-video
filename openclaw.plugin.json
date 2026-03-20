@@ -17,6 +17,11 @@
         "default": "~/inbeidou_cli.py",
         "description": "Absolute path to the existing inbeidou_cli.py backend script."
       },
+      "authToken": {
+        "type": "string",
+        "default": "",
+        "description": "Optional Inbeidou token passed to the backend as INBEIDOU_TOKEN."
+      },
       "downloadDir": {
         "type": "string",
         "default": "~/Desktop",

@@ -36,6 +36,11 @@ const CONFIG_SCHEMA = {
       default: "~/inbeidou_cli.py",
       description: "Absolute path to the existing inbeidou_cli.py backend script."
     },
+    authToken: {
+      type: "string",
+      default: "",
+      description: "Optional Inbeidou token passed to the backend as INBEIDOU_TOKEN."
+    },
     downloadDir: {
       type: "string",
       default: "~/Desktop",
@@ -130,6 +135,17 @@ function resolvePythonBin(api) {
   return config.pythonBin || process.env.BARRY_VIDEO_PYTHON || "python3";
 }
 
+function resolveAuthToken(api) {
+  const config = getPluginConfig(api);
+  return (
+    config.authToken ||
+    process.env.BARRY_VIDEO_AUTH_TOKEN ||
+    process.env.BARRY_VIDEO_TOKEN ||
+    process.env.INBEIDOU_TOKEN ||
+    ""
+  );
+}
+
 function resolveBackendCli(api) {
   const config = getPluginConfig(api);
   const candidates = [
@@ -221,6 +237,7 @@ function toolResponse(title, payload, command) {
 async function runBackend(api, cliArgs, options = {}) {
   const pythonBin = resolvePythonBin(api);
   const backendCli = resolveBackendCli(api);
+  const authToken = resolveAuthToken(api);
 
   if (!backendCli) {
     throw new Error("Barry Video backend is not configured. Set plugins.entries['barry-video'].config.backendCli.");
@@ -234,7 +251,10 @@ async function runBackend(api, cliArgs, options = {}) {
 
   return await new Promise((resolve, reject) => {
     const child = spawn(pythonBin, commandArgs, {
-      env: process.env,
+      env: {
+        ...process.env,
+        ...(authToken ? { INBEIDOU_TOKEN: authToken } : {})
+      },
       stdio: ["ignore", "pipe", "pipe"]
     });
 

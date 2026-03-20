@@ -12,6 +12,7 @@ SKILL_DIR="$SKILLS_DIR/barry-video"
 CONFIG_FILE="$OPENCLAW_HOME/openclaw.json"
 PYTHON_BIN="${BARRY_VIDEO_PYTHON:-python3}"
 DOWNLOAD_DIR="${BARRY_VIDEO_DOWNLOAD_DIR:-$HOME/Desktop}"
+AUTH_TOKEN="${BARRY_VIDEO_AUTH_TOKEN:-${BARRY_VIDEO_TOKEN:-${INBEIDOU_TOKEN:-}}}"
 DEFAULT_ACCOUNT_IDS="${BARRY_VIDEO_DEFAULT_ACCOUNT_IDS:-}"
 DEFAULT_TEAM_IDS="${BARRY_VIDEO_DEFAULT_TEAM_IDS:-}"
 DEFAULT_PUBLISH_PLATFORM="${BARRY_VIDEO_DEFAULT_PUBLISH_PLATFORM:-FACEBOOK}"
@@ -58,10 +59,15 @@ if [ -n "$SOURCE_BACKEND" ]; then
   CONFIG_BACKEND_CLI="$PLUGIN_BACKEND"
 else
   CONFIG_BACKEND_CLI="$PLUGIN_BACKEND"
-  echo "Warning: source inbeidou_cli.py not found during install; expected one of:" >&2
-  echo "  - \$BARRY_VIDEO_BACKEND" >&2
-  echo "  - $HOME/inbeidou_cli.py" >&2
-  echo "  - /Users/ming/inbeidou_cli.py" >&2
+  if [ -f "$PLUGIN_BACKEND" ]; then
+    echo "Using bundled Barry Video backend: $PLUGIN_BACKEND"
+  else
+    echo "Warning: no local or bundled inbeidou_cli.py backend found during install." >&2
+    echo "Expected one of:" >&2
+    echo "  - \$BARRY_VIDEO_BACKEND" >&2
+    echo "  - $HOME/inbeidou_cli.py" >&2
+    echo "  - /Users/ming/inbeidou_cli.py" >&2
+  fi
 fi
 
 for skill_path in "$ROOT_DIR"/skills/*; do
@@ -71,7 +77,7 @@ for skill_path in "$ROOT_DIR"/skills/*; do
   cp -R "$skill_path" "$SKILLS_DIR/$skill_name"
 done
 
-python3 - "$CONFIG_FILE" "$PLUGIN_DIR" "$SKILLS_DIR" "$CONFIG_BACKEND_CLI" "$PYTHON_BIN" "$DOWNLOAD_DIR" "$DEFAULT_ACCOUNT_IDS" "$DEFAULT_TEAM_IDS" "$DEFAULT_PUBLISH_PLATFORM" "$DEFAULT_DRAMA_PLATFORM" "$DEFAULT_LANGUAGE" "$DEFAULT_DRAMA_ORDER" <<'PY'
+python3 - "$CONFIG_FILE" "$PLUGIN_DIR" "$SKILLS_DIR" "$CONFIG_BACKEND_CLI" "$PYTHON_BIN" "$DOWNLOAD_DIR" "$AUTH_TOKEN" "$DEFAULT_ACCOUNT_IDS" "$DEFAULT_TEAM_IDS" "$DEFAULT_PUBLISH_PLATFORM" "$DEFAULT_DRAMA_PLATFORM" "$DEFAULT_LANGUAGE" "$DEFAULT_DRAMA_ORDER" <<'PY'
 import json
 import pathlib
 import sys
@@ -82,12 +88,13 @@ skills_dir = str(pathlib.Path(sys.argv[3]).expanduser().resolve())
 backend_cli = str(pathlib.Path(sys.argv[4]).expanduser())
 python_bin = sys.argv[5]
 download_dir = str(pathlib.Path(sys.argv[6]).expanduser())
-default_account_ids = [item.strip() for item in sys.argv[7].split(",") if item.strip()]
-default_team_ids = [item.strip() for item in sys.argv[8].split(",") if item.strip()]
-default_publish_platform = sys.argv[9]
-default_drama_platform = sys.argv[10]
-default_language = sys.argv[11]
-default_drama_order = sys.argv[12]
+auth_token = sys.argv[7]
+default_account_ids = [item.strip() for item in sys.argv[8].split(",") if item.strip()]
+default_team_ids = [item.strip() for item in sys.argv[9].split(",") if item.strip()]
+default_publish_platform = sys.argv[10]
+default_drama_platform = sys.argv[11]
+default_language = sys.argv[12]
+default_drama_order = sys.argv[13]
 
 config_file.parent.mkdir(parents=True, exist_ok=True)
 if config_file.exists():
@@ -119,6 +126,8 @@ plugin_config = plugin_entry.setdefault("config", {})
 plugin_config["backendCli"] = backend_cli
 plugin_config.setdefault("pythonBin", python_bin)
 plugin_config.setdefault("downloadDir", download_dir)
+if auth_token:
+    plugin_config["authToken"] = auth_token
 plugin_config.setdefault("defaultAccountIds", default_account_ids)
 plugin_config.setdefault("defaultTeamIds", default_team_ids)
 plugin_config.setdefault("defaultPublishPlatform", default_publish_platform)

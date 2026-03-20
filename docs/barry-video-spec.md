@@ -945,7 +945,7 @@ barry-video/
 
 这一步很重要，因为它把原本写死在脚本里的默认行为，提升成了可安装后的运行时配置。
 
-从 `0.2.1` 开始，安装器还会把当前机器上可用的 `inbeidou_cli.py` 复制到插件私有目录 `backend/inbeidou_cli.py`，运行时优先使用这份私有副本。这样 OpenClaw 后续即使换了工作目录、用户目录或原始脚本路径，也不会因为找不到最初的绝对路径而直接失效。
+从 `0.2.2` 开始，npm 包本身也会直接携带一份不含硬编码 token 的 `backend/inbeidou_cli.py`。安装器优先复制当前机器上已有的本地 backend 快照；如果找不到本地源文件，则退回到包内自带 backend。这样 OpenClaw 后续即使换了工作目录、用户目录或原始脚本路径，也不会因为找不到最初的绝对路径而直接失效。
 
 ### 11.5 `index.ts` 的职责
 
@@ -1210,8 +1210,9 @@ barry-video/
 
 1. 把 plugin 复制到 `~/.openclaw/extensions/barry-video`
 2. 把 skills 复制到 `~/.openclaw/skills/*`
-3. 把本机现成的 `inbeidou_cli.py` 复制到 `~/.openclaw/extensions/barry-video/backend/inbeidou_cli.py`
-4. 更新 `~/.openclaw/openclaw.json`
+3. 优先把本机现成的 `inbeidou_cli.py` 复制到 `~/.openclaw/extensions/barry-video/backend/inbeidou_cli.py`
+4. 如果本机不存在源 backend，则保留包内自带的 `backend/inbeidou_cli.py`
+5. 更新 `~/.openclaw/openclaw.json`
 
 ### 13.2 安装时修改的 OpenClaw 配置
 
@@ -1249,6 +1250,12 @@ barry-video/
 - `$BARRY_VIDEO_BACKEND`
 - `$HOME/inbeidou_cli.py`
 - `/Users/ming/inbeidou_cli.py`
+
+从 `0.2.2` 起，还支持通过以下环境变量把 token 注入到 OpenClaw 配置或运行环境：
+
+- `INBEIDOU_TOKEN`
+- `BARRY_VIDEO_AUTH_TOKEN`
+- `BARRY_VIDEO_TOKEN`
 
 ### 13.4 `bin/barry-video` 的作用
 
