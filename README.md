@@ -65,7 +65,7 @@ By default, install now does this in one flow:
 
 - Installs the plugin and skills into `~/.openclaw`
 - Writes Barry Video plugin config
-- If no token is already configured, automatically opens the official QR login page
+- If no token is already configured, automatically prints the official WeChat login QR directly in the terminal
 - Waits for scan confirmation, then saves the token
 
 Optional environment variables for install:
@@ -90,10 +90,16 @@ npx -y barry-video login
 What it does:
 
 - Calls the official Inbeidou QR login API
-- Opens a local browser page that shows the QR code
+- Renders the returned QR image directly in the terminal
 - Polls the login status automatically
 - Saves the returned token into `~/.openclaw/openclaw.json`
 - Caches a local copy at `~/.barry-video/auth.json`
+
+Notes:
+
+- `barry-video install` automatically enters this login flow after install when no token exists
+- `--no-open` is still accepted for backward compatibility, but the login flow no longer depends on `127.0.0.1`
+- The original QR image is also saved at `~/.barry-video/last-login-qr.jpg` as a fallback
 
 Useful commands:
 

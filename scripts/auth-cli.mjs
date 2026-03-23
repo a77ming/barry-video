@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 
-import { spawn } from "node:child_process";
-import http from "node:http";
 import path from "node:path";
 import process from "node:process";
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { setTimeout as delay } from "node:timers/promises";
+
+const require = createRequire(import.meta.url);
+const jpeg = require("jpeg-js");
 
 const API_BASE = "https://api-scenter.inbeidou.cn";
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
@@ -222,306 +224,224 @@ function updateStatus(state, phase, message) {
   state.updatedAt = new Date().toISOString();
 }
 
-function renderLoginPage(qrByte) {
-  const qrDataUrl = `data:image/jpeg;base64,${qrByte}`;
-
-  return `<!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Barry Video Login</title>
-    <style>
-      :root {
-        --bg: #f5efe3;
-        --paper: #fcf8f0;
-        --ink: #162113;
-        --muted: #627060;
-        --line: #d8cfbf;
-        --accent: #2d7f55;
-        --accent-soft: #dcecdf;
-        --warn: #9c6b24;
-        --warn-soft: #f6ead2;
-        --err: #a02f2f;
-        --err-soft: #f7dddd;
-      }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        background:
-          radial-gradient(circle at 0 0, rgba(45,127,85,0.12), transparent 28%),
-          radial-gradient(circle at 100% 100%, rgba(189,142,54,0.12), transparent 24%),
-          var(--bg);
-        color: var(--ink);
-        font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
-        display: grid;
-        place-items: center;
-        padding: 24px;
-      }
-      .card {
-        width: min(880px, 100%);
-        background: rgba(252, 248, 240, 0.94);
-        border: 1px solid var(--line);
-        border-radius: 28px;
-        box-shadow: 0 28px 80px rgba(40, 32, 16, 0.12);
-        overflow: hidden;
-      }
-      .layout {
-        display: grid;
-        grid-template-columns: 1.15fr 0.85fr;
-      }
-      .panel {
-        padding: 34px;
-      }
-      .hero {
-        background:
-          linear-gradient(180deg, rgba(45,127,85,0.08), rgba(45,127,85,0)),
-          var(--paper);
-        border-right: 1px solid var(--line);
-      }
-      .eyebrow {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 12px;
-        border-radius: 999px;
-        background: var(--accent-soft);
-        color: var(--accent);
-        font-size: 13px;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-      }
-      h1 {
-        margin: 18px 0 10px;
-        font-size: clamp(30px, 4vw, 52px);
-        line-height: 0.98;
-      }
-      p {
-        margin: 0;
-        color: var(--muted);
-        font-size: 15px;
-        line-height: 1.7;
-      }
-      .steps {
-        margin-top: 28px;
-        display: grid;
-        gap: 12px;
-      }
-      .step {
-        display: grid;
-        grid-template-columns: 34px 1fr;
-        gap: 12px;
-        align-items: start;
-        padding: 14px 16px;
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.6);
-        border: 1px solid rgba(216, 207, 191, 0.8);
-      }
-      .step-num {
-        width: 34px;
-        height: 34px;
-        border-radius: 50%;
-        display: grid;
-        place-items: center;
-        background: var(--ink);
-        color: white;
-        font-weight: 700;
-      }
-      .qr-wrap {
-        display: grid;
-        gap: 18px;
-        justify-items: center;
-        align-content: center;
-        min-height: 100%;
-      }
-      .qr-box {
-        width: min(320px, 100%);
-        aspect-ratio: 1;
-        background: white;
-        border-radius: 24px;
-        padding: 20px;
-        border: 1px solid var(--line);
-        box-shadow: 0 18px 48px rgba(26, 32, 17, 0.08);
-      }
-      .qr-box img {
-        display: block;
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-      }
-      .status {
-        width: 100%;
-        border-radius: 18px;
-        padding: 16px 18px;
-        background: var(--warn-soft);
-        color: var(--warn);
-        border: 1px solid rgba(156, 107, 36, 0.18);
-      }
-      .status[data-phase="success"] {
-        background: var(--accent-soft);
-        color: var(--accent);
-        border-color: rgba(45, 127, 85, 0.18);
-      }
-      .status[data-phase="error"],
-      .status[data-phase="expired"] {
-        background: var(--err-soft);
-        color: var(--err);
-        border-color: rgba(160, 47, 47, 0.18);
-      }
-      .status strong {
-        display: block;
-        font-size: 14px;
-        margin-bottom: 6px;
-      }
-      .hint {
-        font-size: 13px;
-        text-align: center;
-        color: var(--muted);
-      }
-      @media (max-width: 820px) {
-        .layout {
-          grid-template-columns: 1fr;
-        }
-        .hero {
-          border-right: 0;
-          border-bottom: 1px solid var(--line);
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <div class="layout">
-        <section class="panel hero">
-          <div class="eyebrow">Barry Video Auth</div>
-          <h1>微信扫码<br />直接登录</h1>
-          <p>这个二维码来自 Inbeidou 官方登录接口。扫码成功后，Barry Video 会自动保存 token 到本地配置，不需要再手填 cookie 或手抄 token。</p>
-          <div class="steps">
-            <div class="step">
-              <div class="step-num">1</div>
-              <div>用微信扫描右侧二维码。</div>
-            </div>
-            <div class="step">
-              <div class="step-num">2</div>
-              <div>在微信里确认登录。</div>
-            </div>
-            <div class="step">
-              <div class="step-num">3</div>
-              <div>页面出现“授权成功”后，关闭这个标签页即可。</div>
-            </div>
-          </div>
-        </section>
-        <section class="panel">
-          <div class="qr-wrap">
-            <div class="qr-box">
-              <img src="${qrDataUrl}" alt="Barry Video login QR code" />
-            </div>
-            <div class="status" id="status" data-phase="pending">
-              <strong>等待扫码</strong>
-              <span id="message">等待微信扫码登录</span>
-            </div>
-            <div class="hint" id="updatedAt">状态会自动刷新</div>
-          </div>
-        </section>
-      </div>
-    </div>
-    <script>
-      const phaseLabel = {
-        pending: "等待扫码",
-        success: "授权成功",
-        expired: "二维码已过期",
-        error: "登录失败"
-      };
-
-      async function refreshStatus() {
-        try {
-          const response = await fetch("/status", { cache: "no-store" });
-          const status = await response.json();
-          const phase = status.phase || "pending";
-          document.getElementById("status").dataset.phase = phase;
-          document.getElementById("status").querySelector("strong").textContent = phaseLabel[phase] || phase;
-          document.getElementById("message").textContent = status.message || "";
-          document.getElementById("updatedAt").textContent = status.updatedAt
-            ? "最后更新 " + new Date(status.updatedAt).toLocaleTimeString()
-            : "状态会自动刷新";
-          if (phase === "success" || phase === "expired" || phase === "error") {
-            clearInterval(timer);
-          }
-        } catch (error) {
-          document.getElementById("status").dataset.phase = "error";
-          document.getElementById("status").querySelector("strong").textContent = "状态获取失败";
-          document.getElementById("message").textContent = error.message || "无法获取状态";
-          clearInterval(timer);
-        }
-      }
-
-      const timer = setInterval(refreshStatus, 2000);
-      refreshStatus();
-    </script>
-  </body>
-</html>`;
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }
 
-async function startStatusServer(qrByte, state) {
-  const server = http.createServer((request, response) => {
-    const pathname = request.url || "/";
+function luminance(r, g, b) {
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
 
-    if (pathname === "/status") {
-      response.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
-      response.end(JSON.stringify(state));
-      return;
+function decodeQrImage(qrByte) {
+  try {
+    return jpeg.decode(Buffer.from(qrByte, "base64"), {
+      useTArray: true
+    });
+  } catch (error) {
+    throw new Error(`Failed to decode QR image: ${error.message}`);
+  }
+}
+
+function isContentPixel(r, g, b, a = 255) {
+  if (a < 8) {
+    return false;
+  }
+
+  const spread = Math.max(r, g, b) - Math.min(r, g, b);
+  return luminance(r, g, b) < 246 || spread > 10;
+}
+
+function findContentBounds(image) {
+  const { data, width, height } = image;
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4;
+      const r = data[index];
+      const g = data[index + 1];
+      const b = data[index + 2];
+      const a = data[index + 3];
+
+      if (!isContentPixel(r, g, b, a)) {
+        continue;
+      }
+
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
     }
+  }
 
-    if (pathname === "/favicon.ico") {
-      response.writeHead(204);
-      response.end();
-      return;
-    }
+  if (maxX < 0 || maxY < 0) {
+    return {
+      left: 0,
+      top: 0,
+      right: width - 1,
+      bottom: height - 1
+    };
+  }
 
-    response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
-    response.end(renderLoginPage(qrByte));
-  });
-
-  await new Promise((resolve) => {
-    server.listen(0, "127.0.0.1", resolve);
-  });
-
-  const address = server.address();
-  const port = typeof address === "object" && address ? address.port : 0;
-
+  const padding = Math.max(10, Math.round(Math.min(width, height) * 0.04));
   return {
-    server,
-    url: `http://127.0.0.1:${port}/`
+    left: clamp(minX - padding, 0, width - 1),
+    top: clamp(minY - padding, 0, height - 1),
+    right: clamp(maxX + padding, 0, width - 1),
+    bottom: clamp(maxY + padding, 0, height - 1)
   };
 }
 
-function openBrowser(url) {
-  let command = "";
-  let args = [];
+function calculateOtsuThreshold(image, bounds) {
+  const histogram = new Uint32Array(256);
+  const { data, width } = image;
+  let total = 0;
+  let sum = 0;
 
-  if (process.platform === "darwin") {
-    command = "open";
-    args = [url];
-  } else if (process.platform === "win32") {
-    command = "cmd";
-    args = ["/c", "start", "", url];
-  } else {
-    command = "xdg-open";
-    args = [url];
+  for (let y = bounds.top; y <= bounds.bottom; y += 1) {
+    for (let x = bounds.left; x <= bounds.right; x += 1) {
+      const index = (y * width + x) * 4;
+      const level = Math.round(luminance(data[index], data[index + 1], data[index + 2]));
+      histogram[level] += 1;
+      total += 1;
+      sum += level;
+    }
   }
 
-  try {
-    const child = spawn(command, args, {
-      detached: true,
-      stdio: "ignore"
-    });
-    child.unref();
-    return true;
-  } catch {
-    return false;
+  let backgroundWeight = 0;
+  let backgroundSum = 0;
+  let bestVariance = -1;
+  let threshold = 180;
+
+  for (let level = 0; level < histogram.length; level += 1) {
+    backgroundWeight += histogram[level];
+    if (backgroundWeight === 0) {
+      continue;
+    }
+
+    const foregroundWeight = total - backgroundWeight;
+    if (foregroundWeight === 0) {
+      break;
+    }
+
+    backgroundSum += level * histogram[level];
+    const backgroundMean = backgroundSum / backgroundWeight;
+    const foregroundMean = (sum - backgroundSum) / foregroundWeight;
+    const variance = backgroundWeight * foregroundWeight * (backgroundMean - foregroundMean) ** 2;
+
+    if (variance > bestVariance) {
+      bestVariance = variance;
+      threshold = level;
+    }
   }
+
+  return threshold;
+}
+
+function getTerminalQrSize() {
+  const configured = Number.parseInt(process.env.BARRY_VIDEO_QR_SIZE || "", 10);
+  if (Number.isFinite(configured) && configured >= 48) {
+    return configured % 2 === 0 ? configured : configured - 1;
+  }
+
+  const fallbackColumns = process.stdout.isTTY ? 96 : 72;
+  const maxSize = process.stdout.isTTY ? 96 : 72;
+  const columns = process.stdout.columns || fallbackColumns;
+  const size = Math.max(48, Math.min(maxSize, columns - 4));
+  return size % 2 === 0 ? size : size - 1;
+}
+
+function downsampleQrImage(image, bounds, targetSize) {
+  const { data, width } = image;
+  const sourceWidth = bounds.right - bounds.left + 1;
+  const sourceHeight = bounds.bottom - bounds.top + 1;
+  const threshold = Math.min(236, calculateOtsuThreshold(image, bounds) + 12);
+  const pixels = new Uint8Array(targetSize * targetSize);
+
+  for (let targetY = 0; targetY < targetSize; targetY += 1) {
+    const startY = Math.floor(bounds.top + (sourceHeight * targetY) / targetSize);
+    const endY = Math.max(startY + 1, Math.ceil(bounds.top + (sourceHeight * (targetY + 1)) / targetSize));
+
+    for (let targetX = 0; targetX < targetSize; targetX += 1) {
+      const startX = Math.floor(bounds.left + (sourceWidth * targetX) / targetSize);
+      const endX = Math.max(startX + 1, Math.ceil(bounds.left + (sourceWidth * (targetX + 1)) / targetSize));
+
+      let luminanceSum = 0;
+      let saturationSum = 0;
+      let samples = 0;
+
+      for (let y = startY; y < endY; y += 1) {
+        for (let x = startX; x < endX; x += 1) {
+          const index = (y * width + x) * 4;
+          const r = data[index];
+          const g = data[index + 1];
+          const b = data[index + 2];
+          luminanceSum += luminance(r, g, b);
+          saturationSum += Math.max(r, g, b) - Math.min(r, g, b);
+          samples += 1;
+        }
+      }
+
+      const averageLuminance = luminanceSum / samples;
+      const averageSaturation = saturationSum / samples;
+      const isDark = averageLuminance <= threshold || (averageLuminance <= 235 && averageSaturation >= 40);
+      pixels[targetY * targetSize + targetX] = isDark ? 1 : 0;
+    }
+  }
+
+  return pixels;
+}
+
+function renderQrToTerminal(pixels, size) {
+  const lines = [];
+
+  for (let y = 0; y < size; y += 2) {
+    let line = "";
+
+    for (let x = 0; x < size; x += 1) {
+      const top = pixels[y * size + x];
+      const bottom = y + 1 < size ? pixels[(y + 1) * size + x] : 0;
+
+      if (top && bottom) {
+        line += "█";
+      } else if (top) {
+        line += "▀";
+      } else if (bottom) {
+        line += "▄";
+      } else {
+        line += " ";
+      }
+    }
+
+    lines.push(line);
+  }
+
+  return lines.join("\n");
+}
+
+async function persistQrImage(qrByte) {
+  const filePath = path.join(AUTH_HOME, "last-login-qr.jpg");
+  await mkdir(AUTH_HOME, { recursive: true });
+  await writeFile(filePath, Buffer.from(qrByte, "base64"));
+  return filePath;
+}
+
+async function showTerminalQr(qrByte) {
+  const image = decodeQrImage(qrByte);
+  const bounds = findContentBounds(image);
+  const size = getTerminalQrSize();
+  const pixels = downsampleQrImage(image, bounds, size);
+  const savedImage = await persistQrImage(qrByte);
+
+  process.stdout.write("\n");
+  process.stdout.write(renderQrToTerminal(pixels, size));
+  process.stdout.write("\n\n");
+  process.stdout.write("Use WeChat to scan the QR above.\n");
+  process.stdout.write(`Raw QR image saved at: ${savedImage}\n`);
+  process.stdout.write("If the QR is hard to scan, widen the terminal and rerun, or set BARRY_VIDEO_QR_SIZE=120.\n");
 }
 
 async function loginWithQr(options) {
@@ -544,59 +464,50 @@ async function loginWithQr(options) {
     message: "等待微信扫码登录",
     updatedAt: new Date().toISOString()
   };
-  const { server, url } = await startStatusServer(loginBody.qrByte, state);
-  let browserOpened = false;
+  let lastStatusMessage = "";
 
-  try {
-    if (!options.noOpen) {
-      browserOpened = openBrowser(url);
-    }
-
-    process.stdout.write(`Barry Video login page: ${url}\n`);
-    if (options.noOpen) {
-      process.stdout.write("Browser auto-open skipped.\n");
-    } else if (!browserOpened) {
-      process.stdout.write("Browser did not open automatically. Open the URL above manually.\n");
-    }
-    process.stdout.write("Waiting for WeChat QR confirmation...\n");
-
-    const deadline = Date.now() + options.timeoutMs;
-
-    while (Date.now() < deadline) {
-      const payload = await apiPost("/agent/v1/user/login/check_qr", { si: loginBody.si });
-
-      if (payload.code === 0 && payload.body?.access_token) {
-        await persistToken(payload.body.access_token, {
-          source: "wechat-qr",
-          userInfo: payload.body.user_info || null
-        });
-        updateStatus(state, "success", "授权成功，token 已写入本地配置");
-        process.stdout.write(`Login succeeded. Saved token to ${AUTH_FILE} and ${OPENCLAW_CONFIG_FILE}\n`);
-        await delay(1500);
-        return 0;
-      }
-
-      if (payload.code === 10406) {
-        updateStatus(state, "pending", payload.msg || "扫码等待登录中");
-        const remainingMs = deadline - Date.now();
-        if (remainingMs <= 0) {
-          break;
-        }
-        await delay(Math.min(POLL_INTERVAL_MS, remainingMs));
-        continue;
-      }
-
-      updateStatus(state, "error", payload.msg || "二维码登录失败");
-      throw new Error(payload.msg || "二维码登录失败");
-    }
-
-    updateStatus(state, "expired", "二维码已超时，请重新运行 barry-video login");
-    throw new Error("二维码已超时，请重新运行 barry-video login");
-  } finally {
-    await new Promise((resolve) => {
-      server.close(resolve);
-    });
+  await showTerminalQr(loginBody.qrByte);
+  if (options.noOpen) {
+    process.stdout.write("--no-open is kept for compatibility; login now uses terminal QR output.\n");
   }
+  process.stdout.write("Waiting for WeChat QR confirmation...\n");
+
+  const deadline = Date.now() + options.timeoutMs;
+
+  while (Date.now() < deadline) {
+    const payload = await apiPost("/agent/v1/user/login/check_qr", { si: loginBody.si });
+
+    if (payload.code === 0 && payload.body?.access_token) {
+      await persistToken(payload.body.access_token, {
+        source: "wechat-qr",
+        userInfo: payload.body.user_info || null
+      });
+      updateStatus(state, "success", "授权成功，token 已写入本地配置");
+      process.stdout.write(`Login succeeded. Saved token to ${AUTH_FILE} and ${OPENCLAW_CONFIG_FILE}\n`);
+      return 0;
+    }
+
+    if (payload.code === 10406) {
+      const pendingMessage = payload.msg || "扫码等待登录中";
+      updateStatus(state, "pending", pendingMessage);
+      if (pendingMessage !== lastStatusMessage) {
+        process.stdout.write(`Status: ${pendingMessage}\n`);
+        lastStatusMessage = pendingMessage;
+      }
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        break;
+      }
+      await delay(Math.min(POLL_INTERVAL_MS, remainingMs));
+      continue;
+    }
+
+    updateStatus(state, "error", payload.msg || "二维码登录失败");
+    throw new Error(payload.msg || "二维码登录失败");
+  }
+
+  updateStatus(state, "expired", "二维码已超时，请重新运行 barry-video login");
+  throw new Error("二维码已超时，请重新运行 barry-video login");
 }
 
 async function showStatus() {
