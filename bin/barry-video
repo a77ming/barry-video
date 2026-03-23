@@ -11,6 +11,7 @@ BIN_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 ROOT_DIR="$(cd "$BIN_DIR/.." && pwd)"
 PRIVATE_BACKEND="$ROOT_DIR/backend/inbeidou_cli.py"
 BACKEND_CLI="${BARRY_VIDEO_BACKEND:-$PRIVATE_BACKEND}"
+OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
 if [ ! -f "$BACKEND_CLI" ]; then
   if [ -f "$HOME/inbeidou_cli.py" ]; then
     BACKEND_CLI="$HOME/inbeidou_cli.py"
@@ -20,10 +21,47 @@ if [ ! -f "$BACKEND_CLI" ]; then
 fi
 PYTHON_BIN="${BARRY_VIDEO_PYTHON:-python3}"
 
+read_saved_auth_token() {
+  "$PYTHON_BIN" - "$OPENCLAW_HOME" "$HOME/.barry-video/auth.json" <<'PY'
+import json
+import pathlib
+import sys
+
+openclaw_home = pathlib.Path(sys.argv[1]).expanduser()
+auth_file = pathlib.Path(sys.argv[2]).expanduser()
+
+def read_json(path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+auth_payload = read_json(auth_file)
+token = auth_payload.get("authToken") or auth_payload.get("token") or ""
+if token:
+    print(token)
+    raise SystemExit(0)
+
+openclaw_payload = read_json(openclaw_home / "openclaw.json")
+token = (
+    openclaw_payload.get("plugins", {})
+    .get("entries", {})
+    .get("barry-video", {})
+    .get("config", {})
+    .get("authToken", "")
+)
+if token:
+    print(token)
+PY
+}
+
 usage() {
   cat <<'EOF'
 Usage:
-  barry-video install
+  barry-video install [--no-login] [--no-open] [--timeout-ms 300000]
+  barry-video login [--no-open] [--timeout-ms 300000]
+  barry-video logout
+  barry-video status
   barry-video backend <inbeidou_cli.py args...>
   barry-video package [output.tgz]
   barry-video smoke
@@ -37,8 +75,17 @@ case "$COMMAND" in
     shift
     exec "$ROOT_DIR/scripts/install-local.sh" "$@"
     ;;
+  login|logout|status)
+    exec node "$ROOT_DIR/scripts/auth-cli.mjs" "$COMMAND" "${@:2}"
+    ;;
   backend)
     shift
+    if [ -z "${INBEIDOU_TOKEN:-}" ] && [ -z "${BARRY_VIDEO_AUTH_TOKEN:-}" ] && [ -z "${BARRY_VIDEO_TOKEN:-}" ]; then
+      SAVED_TOKEN="$(read_saved_auth_token || true)"
+      if [ -n "$SAVED_TOKEN" ]; then
+        export INBEIDOU_TOKEN="$SAVED_TOKEN"
+      fi
+    fi
     exec "$PYTHON_BIN" "$BACKEND_CLI" "$@"
     ;;
   package)

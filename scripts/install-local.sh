@@ -21,6 +21,36 @@ DEFAULT_LANGUAGE="${BARRY_VIDEO_DEFAULT_LANGUAGE:-2}"
 DEFAULT_DRAMA_ORDER="${BARRY_VIDEO_DEFAULT_DRAMA_ORDER:-publish_at}"
 SOURCE_BACKEND=""
 CONFIG_BACKEND_CLI=""
+AUTO_LOGIN=1
+LOGIN_NO_OPEN=0
+LOGIN_TIMEOUT_MS=""
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --no-login|--skip-login)
+      AUTO_LOGIN=0
+      ;;
+    --no-open)
+      LOGIN_NO_OPEN=1
+      ;;
+    --timeout-ms)
+      if [ "$#" -lt 2 ]; then
+        echo "Error: --timeout-ms requires a value" >&2
+        exit 1
+      fi
+      LOGIN_TIMEOUT_MS="$2"
+      shift
+      ;;
+    --timeout-ms=*)
+      LOGIN_TIMEOUT_MS="${1#*=}"
+      ;;
+    *)
+      echo "Error: unknown install option: $1" >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
 
 expand_home() {
   local value="$1"
@@ -151,3 +181,28 @@ echo "Updated OpenClaw config: $CONFIG_FILE"
 if [ -f "$PLUGIN_BACKEND" ]; then
   echo "Installed Barry Video private backend into: $PLUGIN_BACKEND"
 fi
+
+if [ -n "$AUTH_TOKEN" ]; then
+  echo "Auth token provided during install. Login step skipped."
+  exit 0
+fi
+
+if [ "$AUTO_LOGIN" -eq 0 ]; then
+  echo "Install finished without login. Run 'barry-video login' later when you want to sign in."
+  exit 0
+fi
+
+if node "$ROOT_DIR/scripts/auth-cli.mjs" status >/dev/null 2>&1; then
+  echo "Found an existing Barry Video auth token. Login step skipped."
+  exit 0
+fi
+
+echo "Launching Barry Video QR login..."
+LOGIN_CMD=(node "$ROOT_DIR/scripts/auth-cli.mjs" login)
+if [ "$LOGIN_NO_OPEN" -eq 1 ]; then
+  LOGIN_CMD+=("--no-open")
+fi
+if [ -n "$LOGIN_TIMEOUT_MS" ]; then
+  LOGIN_CMD+=("--timeout-ms" "$LOGIN_TIMEOUT_MS")
+fi
+"${LOGIN_CMD[@]}"

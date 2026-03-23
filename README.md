@@ -55,6 +55,19 @@ cd /Users/ming/barry-video
 ./scripts/install-local.sh
 ```
 
+Or:
+
+```bash
+npx -y barry-video install
+```
+
+By default, install now does this in one flow:
+
+- Installs the plugin and skills into `~/.openclaw`
+- Writes Barry Video plugin config
+- If no token is already configured, automatically opens the official QR login page
+- Waits for scan confirmation, then saves the token
+
 Optional environment variables for install:
 
 ```bash
@@ -65,6 +78,38 @@ export BARRY_VIDEO_DEFAULT_PUBLISH_PLATFORM="FACEBOOK"
 ```
 
 If you are installing on a different runtime user or machine, set `INBEIDOU_TOKEN` or `BARRY_VIDEO_AUTH_TOKEN` so the bundled backend can authenticate without depending on a local hardcoded script.
+
+## Login without pasting tokens
+
+The package now supports the official Inbeidou QR login flow.
+
+```bash
+npx -y barry-video login
+```
+
+What it does:
+
+- Calls the official Inbeidou QR login API
+- Opens a local browser page that shows the QR code
+- Polls the login status automatically
+- Saves the returned token into `~/.openclaw/openclaw.json`
+- Caches a local copy at `~/.barry-video/auth.json`
+
+Useful commands:
+
+```bash
+barry-video login --no-open
+barry-video status
+barry-video logout
+```
+
+After login, `barry-video backend ...` will auto-load the saved token if `INBEIDOU_TOKEN` is not already set.
+
+If you want install without opening login, use:
+
+```bash
+barry-video install --no-login
+```
 
 ## Smoke test
 
