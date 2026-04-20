@@ -22,7 +22,7 @@ Use it when the user speaks naturally, for example:
 ## Prefer dedicated tools
 
 - Account and pricing: `barry_video_user`, `barry_video_credit`, `barry_video_products`, `barry_video_languages`
-- Drama discovery: `barry_video_dramas`
+- Drama discovery: `barry_video_dramas`, `barry_video_drama_detail`
 - Media and AI: `barry_video_uploads_list`, `barry_video_upload`, `barry_video_uploads_delete`, `barry_video_analyze`, `barry_video_clip_types`, `barry_video_clip`, `barry_video_translate_languages`, `barry_video_translate_fonts`, `barry_video_translate_styles`, `barry_video_translate`
 - Generated works: `barry_video_manus_list`, `barry_video_manus_detail`, `barry_video_download_manus`, `barry_video_manus_delete`
 - Publish: `barry_video_publish_accounts`, `barry_video_publish`, `barry_video_publish_records`, `barry_video_publish_delete`, `barry_video_pipeline`
@@ -31,10 +31,11 @@ Use it when the user speaks naturally, for example:
 
 1. If the user asks a factual account question such as balance, products, or profile, call the matching account tool directly.
 2. If the user asks for a latest drama, call `barry_video_dramas` with platform `dramabox` unless another platform is specified.
-3. If the user asks to analyze, clip, or translate a local file, pass `file` directly to the AI media tool instead of forcing a separate upload step.
-4. If the user asks to publish and there is no known account or team ID, call `barry_video_publish_accounts` first.
-5. If the user asks for clip then publish in one sentence, prefer `barry_video_pipeline`.
-6. After publishing, use `barry_video_publish_records` to confirm the final status.
+3. If the user asks for a task detail page, promotion links, app link, serial link, or a drama's推广口令, call `barry_video_drama_detail`.
+4. If the user asks to analyze, clip, or translate a local file, pass `file` directly to the AI media tool instead of forcing a separate upload step.
+5. If the user asks to publish and there is no known account or team ID, call `barry_video_publish_accounts` first.
+6. If the user asks for clip then publish in one sentence, prefer `barry_video_pipeline`.
+7. After publishing, use `barry_video_publish_records` to confirm the final status.
 
 ## Authentication
 
