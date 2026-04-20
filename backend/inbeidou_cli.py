@@ -14,6 +14,7 @@
 - translate: 视频翻译
 - manus: 我的作品
 - list: 短剧列表
+- detail: 短剧详情/推广链接
 """
 
 import argparse
@@ -40,11 +41,7 @@ DEFAULT_TIMEOUT = 60
 DEFAULT_POLL_INTERVAL = 3
 DEFAULT_TASK_TIMEOUT = 1800
 STATE_FILE = Path.home() / ".inbeidou_cli_state.json"
-
-TOKEN = os.getenv(
-    "INBEIDOU_TOKEN",
-    "",
-)
+AUTH_STATE_FILE = Path.home() / ".barry-video" / "auth_state.json"
 
 PLATFORMS = {
     "dramabox": "DramaBox",
@@ -65,6 +62,14 @@ PLATFORMS = {
     "dramasnacker": "DramaSnacker(H5)",
     "playlet": "Playlet",
 }
+
+PROMOTION_PLATFORMS = {
+    1: "TikTok",
+    2: "Facebook",
+    3: "Instagram",
+    4: "YouTube",
+}
+PROMOTION_PLATFORM_NAMES = {name.lower(): platform_id for platform_id, name in PROMOTION_PLATFORMS.items()}
 
 HIGH_CUT_TASK_KEY = "high"
 TRANSLATE_TASK_KEY = "trans"
@@ -161,11 +166,32 @@ def load_state():
         return {}
 
 
+def load_auth_token():
+    """优先从环境变量，其次从 beidou-auth 缓存读取 token。"""
+    token = os.getenv("INBEIDOU_TOKEN", "").strip()
+    if token:
+        return token
+
+    if not AUTH_STATE_FILE.exists():
+        return ""
+
+    try:
+        payload = json.loads(AUTH_STATE_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return ""
+
+    if payload.get("status") != "success":
+        return ""
+    if not payload.get("expired_at") or int(payload["expired_at"]) <= int(time.time() * 1000):
+        return ""
+    return str(payload.get("access_token", "")).strip()
+
+
 def auth_headers(auth_style="raw"):
     """按站点生成鉴权头。"""
-    token = TOKEN.strip()
+    token = load_auth_token()
     if not token:
-        raise InbeidouError("缺少 TOKEN，请设置 INBEIDOU_TOKEN")
+        raise InbeidouError("缺少 TOKEN，请设置 INBEIDOU_TOKEN 或完成 ~/.barry-video/auth_state.json 授权")
     if auth_style == "bearer":
         token = f"Bearer {token}"
     return {"Authorization": token}
@@ -270,6 +296,80 @@ def format_drama(item):
     print(f"   任务ID: {item.get('task_id', 'N/A')}")
 
 
+def normalize_promotion_platform(value):
+    raw = str(value).strip()
+    if not raw:
+        raise InbeidouError("推广平台不能为空")
+    if raw.isdigit():
+        platform_id = int(raw)
+    else:
+        platform_id = PROMOTION_PLATFORM_NAMES.get(raw.lower())
+    if platform_id not in PROMOTION_PLATFORMS:
+        choices = ", ".join(f"{platform_id}:{name}" for platform_id, name in PROMOTION_PLATFORMS.items())
+        raise InbeidouError(f"不支持的推广平台: {value}，可选 {choices}")
+    return platform_id
+
+
+def normalize_promotion_platforms(values, include_all=False):
+    if include_all or not values:
+        return list(PROMOTION_PLATFORMS.keys())
+    ordered = []
+    seen = set()
+    for value in values:
+        platform_id = normalize_promotion_platform(value)
+        if platform_id not in seen:
+            seen.add(platform_id)
+            ordered.append(platform_id)
+    return ordered
+
+
+def resolve_task_for_detail(args):
+    if args.task_id:
+        body = require_success(
+            get_task_info(task_id=args.task_id, app_id=args.platform, task_type=args.task_type),
+            "获取短剧详情",
+        )
+        return body
+
+    if not args.search:
+        raise InbeidouError("detail 至少需要 --task-id 或 --search")
+
+    body = require_success(
+        get_tasks(
+            page=1,
+            page_size=max(1, args.size),
+            platform=args.platform,
+            language=args.language,
+            search=args.search,
+            order=args.order,
+        ),
+        "搜索短剧",
+    )
+    items = body.get("data", [])
+    if not items:
+        raise InbeidouError(f"未找到短剧: {args.search}")
+
+    keyword = args.search.strip().lower()
+    exact = next((item for item in items if str(item.get("title", "")).strip().lower() == keyword), None)
+    return exact or items[0]
+
+
+def build_promotion_link_entry(platform_id, payload):
+    codes = payload.get("codes", []) if isinstance(payload.get("codes"), list) else []
+    return {
+        "platform_id": platform_id,
+        "platform_name": PROMOTION_PLATFORMS.get(platform_id, f"平台{platform_id}"),
+        "atr_id": payload.get("atr_id"),
+        "app_link": payload.get("app_link", ""),
+        "serial_link": payload.get("serial_link", ""),
+        "tiktok_dramago_link": payload.get("tiktok_dramago_link", ""),
+        "tiktok_url": payload.get("tiktok_url", ""),
+        "code": payload.get("code", ""),
+        "promote_code_content": payload.get("promote_code_content", ""),
+        "codes": codes,
+    }
+
+
 def probe_video(file_path):
     """用 ffprobe 读取上传所需的视频元数据。"""
     path = Path(file_path).expanduser().resolve()
@@ -371,6 +471,25 @@ def get_tasks(page=1, page_size=15, platform="", language="2", search="", order=
     if platform:
         params["app_id"] = platform
     return api_request(SCENTER_API, "/task/page", params=params, auth_style="bearer")
+
+
+def get_task_info(task_id, app_id="", task_type="1"):
+    params = {"task_id": task_id}
+    if app_id:
+        params["app_id"] = app_id
+    if task_type:
+        params["task_type"] = task_type
+    return api_request(SCENTER_API, "/task/info", params=params, auth_style="bearer")
+
+
+def receive_task(task_id, task_type="1", platform=2):
+    """复用 creator task-detail 页点击推广平台按钮时的真实接口。"""
+    payload = {
+        "task_id": int(task_id),
+        "task_type": int(task_type),
+        "platform": int(platform),
+    }
+    return api_request(SCENTER_API, "/task/receive", method="POST", json_data=payload, auth_style="bearer")
 
 
 def get_uploads(page=1, page_size=10):
@@ -1279,6 +1398,56 @@ def cmd_list(args):
     print(f"第 {current} / {total_pages} 页")
 
 
+def cmd_detail(args):
+    item = resolve_task_for_detail(args)
+    promotion_links = []
+    if not args.no_promotion_links:
+        for platform_id in normalize_promotion_platforms(args.promote_platforms, include_all=args.all_promote_platforms):
+            payload = require_success(
+                receive_task(task_id=item["task_id"], task_type=item.get("task_type", args.task_type), platform=platform_id),
+                f"获取 {PROMOTION_PLATFORMS[platform_id]} 推广链接",
+            )
+            promotion_links.append(build_promotion_link_entry(platform_id, payload))
+
+    result = {
+        **item,
+        "promotion_links": promotion_links,
+    }
+
+    if getattr(args, "json", False):
+        pretty_print_json(result)
+        return
+
+    format_drama(item)
+    print(f"   serial_id: {item.get('serial_id', 'N/A')}")
+    print(f"   third_serial_id: {item.get('third_serial_id', 'N/A')}")
+    print("   简介:")
+    print(f"   {item.get('description', '') or 'N/A'}")
+
+    if args.no_promotion_links:
+        return
+
+    print(f"\n{'=' * 60}")
+    print("推广链接")
+    print(f"{'=' * 60}")
+    if not promotion_links:
+        print("暂无推广链接")
+        return
+
+    for entry in promotion_links:
+        print(f"\n[{entry['platform_name']}]")
+        print(f"  app_link: {entry.get('app_link') or 'N/A'}")
+        print(f"  serial_link: {entry.get('serial_link') or 'N/A'}")
+        print(f"  code: {entry.get('code') or 'N/A'}")
+        if entry.get("tiktok_dramago_link"):
+            print(f"  tiktok_dramago_link: {entry['tiktok_dramago_link']}")
+        if entry.get("tiktok_url"):
+            print(f"  tiktok_url: {entry['tiktok_url']}")
+        if entry.get("promote_code_content"):
+            print("  promote_code_content:")
+            print(f"  {entry['promote_code_content']}")
+
+
 def cmd_uploads(args):
     if args.action == "list":
         body = require_success(get_uploads(page=args.page, page_size=args.size), "获取媒资库列表")
@@ -1724,6 +1893,25 @@ def build_parser():
     list_parser.add_argument("--order", type=str, default="publish_at", help="排序字段")
     list_parser.add_argument("--json", action="store_true", help="输出 JSON")
 
+    detail_parser = subparsers.add_parser("detail", help="查看短剧详情并获取推广链接")
+    detail_parser.add_argument("--task-id", type=str, default="", help="任务 ID")
+    detail_parser.add_argument("-p", "--platform", type=str, default="", help="平台 app_id，如 reelshort")
+    detail_parser.add_argument("-l", "--language", type=str, default="2", help="语言 ID")
+    detail_parser.add_argument("-s", "--search", type=str, default="", help="按标题搜索并取首个匹配")
+    detail_parser.add_argument("--size", type=int, default=10, help="搜索候选数量")
+    detail_parser.add_argument("--order", type=str, default="publish_at", help="搜索排序字段")
+    detail_parser.add_argument("--task-type", type=str, default="1", help="任务类型")
+    detail_parser.add_argument(
+        "--promote-platform",
+        dest="promote_platforms",
+        action="append",
+        default=[],
+        help="推广平台，支持 1/2/3/4 或 TikTok/Facebook/Instagram/YouTube，可重复传入",
+    )
+    detail_parser.add_argument("--all-promote-platforms", action="store_true", help="拉取全部平台推广链接")
+    detail_parser.add_argument("--no-promotion-links", action="store_true", help="只看详情，不拉取推广链接")
+    detail_parser.add_argument("--json", action="store_true", help="输出 JSON")
+
     return parser
 
 
@@ -1758,6 +1946,8 @@ def main():
             cmd_manus(args)
         elif args.command == "list":
             cmd_list(args)
+        elif args.command == "detail":
+            cmd_detail(args)
         else:
             parser.print_help()
     except InbeidouError as exc:

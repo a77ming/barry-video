@@ -444,6 +444,23 @@ function buildDramaArgs(api, params = {}) {
   return args;
 }
 
+function buildDramaDetailArgs(api, params = {}) {
+  const defaults = getRuntimeDefaults(api);
+  const args = ["detail"];
+  addOption(args, "--task-id", params.taskId);
+  addOption(args, "--platform", params.platform);
+  addOption(args, "--language", params.language || defaults.defaultLanguage);
+  addOption(args, "--search", params.search);
+  addOption(args, "--size", params.size);
+  addOption(args, "--order", params.order || defaults.defaultDramaOrder);
+  addOption(args, "--task-type", params.taskType);
+  addRepeatedOptions(args, "--promote-platform", params.promotionPlatforms);
+  addFlag(args, params.allPromotionPlatforms, "--all-promote-platforms");
+  addFlag(args, params.noPromotionLinks, "--no-promotion-links");
+  args.push("--json");
+  return args;
+}
+
 function buildUploadListArgs(params = {}) {
   const args = ["uploads", "list", "--json"];
   addOption(args, "--page", params.page);
@@ -538,6 +555,34 @@ function registerBarryTools(api) {
       }
     },
     (params) => buildDramaArgs(api, params)
+  );
+
+  registerJsonTool(
+    api,
+    {
+      name: "barry_video_drama_detail",
+      description: "Get short drama detail and promotion links from the task detail flow.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          taskId: { type: "string" },
+          platform: { type: "string" },
+          language: { type: "string" },
+          search: { type: "string" },
+          size: { type: "integer" },
+          order: { type: "string" },
+          taskType: { type: "string" },
+          promotionPlatforms: {
+            type: "array",
+            items: { type: "string", enum: ["1", "2", "3", "4", "TikTok", "Facebook", "Instagram", "YouTube"] }
+          },
+          allPromotionPlatforms: { type: "boolean" },
+          noPromotionLinks: { type: "boolean" }
+        }
+      }
+    },
+    (params) => buildDramaDetailArgs(api, params)
   );
 
   registerJsonTool(
