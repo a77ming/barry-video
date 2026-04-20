@@ -36,6 +36,14 @@ Use it when the user speaks naturally, for example:
 5. If the user asks for clip then publish in one sentence, prefer `barry_video_pipeline`.
 6. After publishing, use `barry_video_publish_records` to confirm the final status.
 
+## Authentication
+
+If any tool returns a 401 or "token invalid" error, use the `beidou-auth` skill to obtain or refresh the token before retrying.
+
+- Token is loaded automatically from `~/.barry-video/auth_state.json` (managed by beidou-auth)
+- To authorize: `/beidou-auth`
+- To check status: `/beidou-auth status`
+
 ## Read next
 
 - Common natural-language patterns: [references/intents.md](references/intents.md)

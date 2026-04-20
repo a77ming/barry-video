@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
 EXTENSIONS_DIR="$OPENCLAW_HOME/extensions"
 SKILLS_DIR="$OPENCLAW_HOME/skills"
+CLAUDE_SKILLS_DIR="${CLAUDE_HOME:-$HOME/.claude}/skills"
 PLUGIN_DIR="$EXTENSIONS_DIR/barry-video"
 PLUGIN_BACKEND_DIR="$PLUGIN_DIR/backend"
 PLUGIN_BACKEND="$PLUGIN_BACKEND_DIR/inbeidou_cli.py"
@@ -100,11 +101,14 @@ else
   fi
 fi
 
+mkdir -p "$CLAUDE_SKILLS_DIR"
 for skill_path in "$ROOT_DIR"/skills/*; do
   [ -d "$skill_path" ] || continue
   skill_name="$(basename "$skill_path")"
   rm -rf "$SKILLS_DIR/$skill_name"
   cp -R "$skill_path" "$SKILLS_DIR/$skill_name"
+  rm -rf "$CLAUDE_SKILLS_DIR/$skill_name"
+  cp -R "$skill_path" "$CLAUDE_SKILLS_DIR/$skill_name"
 done
 
 python3 - "$CONFIG_FILE" "$PLUGIN_DIR" "$SKILLS_DIR" "$CONFIG_BACKEND_CLI" "$PYTHON_BIN" "$DOWNLOAD_DIR" "$AUTH_TOKEN" "$DEFAULT_ACCOUNT_IDS" "$DEFAULT_TEAM_IDS" "$DEFAULT_PUBLISH_PLATFORM" "$DEFAULT_DRAMA_PLATFORM" "$DEFAULT_LANGUAGE" "$DEFAULT_DRAMA_ORDER" <<'PY'
@@ -177,6 +181,7 @@ PY
 
 echo "Installed Barry Video plugin into: $PLUGIN_DIR"
 echo "Installed Barry Video skills into: $SKILLS_DIR"
+echo "Installed Barry Video skills into: $CLAUDE_SKILLS_DIR (Claude Code)"
 echo "Updated OpenClaw config: $CONFIG_FILE"
 if [ -f "$PLUGIN_BACKEND" ]; then
   echo "Installed Barry Video private backend into: $PLUGIN_BACKEND"

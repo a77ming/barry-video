@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -135,6 +135,25 @@ function resolvePythonBin(api) {
   return config.pythonBin || process.env.BARRY_VIDEO_PYTHON || "python3";
 }
 
+function readBeidouAuthToken() {
+  const authStatePath = path.join(os.homedir(), ".barry-video", "auth_state.json");
+  try {
+    const raw = readFileSync(authStatePath, "utf8");
+    const state = JSON.parse(raw);
+    if (
+      state.access_token &&
+      state.status === "success" &&
+      state.expired_at &&
+      state.expired_at > Date.now()
+    ) {
+      return state.access_token;
+    }
+  } catch {
+    // no valid beidou auth state
+  }
+  return "";
+}
+
 function resolveAuthToken(api) {
   const config = getPluginConfig(api);
   return (
@@ -142,6 +161,7 @@ function resolveAuthToken(api) {
     process.env.BARRY_VIDEO_AUTH_TOKEN ||
     process.env.BARRY_VIDEO_TOKEN ||
     process.env.INBEIDOU_TOKEN ||
+    readBeidouAuthToken() ||
     ""
   );
 }
