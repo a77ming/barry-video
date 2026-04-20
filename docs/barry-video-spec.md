@@ -1210,9 +1210,11 @@ barry-video/
 
 1. 把 plugin 复制到 `~/.openclaw/extensions/barry-video`
 2. 把 skills 复制到 `~/.openclaw/skills/*`
-3. 优先把本机现成的 `inbeidou_cli.py` 复制到 `~/.openclaw/extensions/barry-video/backend/inbeidou_cli.py`
-4. 如果本机不存在源 backend，则保留包内自带的 `backend/inbeidou_cli.py`
-5. 更新 `~/.openclaw/openclaw.json`
+3. 把同一套 skills 复制到 `~/.codex/skills/*`
+4. 把同一套 skills 复制到 `~/.claude/skills/*`
+5. 优先把本机现成的 `inbeidou_cli.py` 复制到 `~/.openclaw/extensions/barry-video/backend/inbeidou_cli.py`
+6. 如果本机不存在源 backend，则保留包内自带的 `backend/inbeidou_cli.py`
+7. 更新 `~/.openclaw/openclaw.json`
 
 ### 13.2 安装时修改的 OpenClaw 配置
 

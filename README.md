@@ -1,11 +1,11 @@
 # Barry Video
 
-`barry-video` is an OpenClaw plugin package for Barry's full Inbeidou workflow.
+`barry-video` is Barry's Inbeidou workflow package for OpenClaw, Codex, and Claude Code.
 
 It packages two layers together:
 
 - Skills: natural-language routing and workflow guidance under [`skills/`](./skills)
-- Tools: real executable capability registered in [`index.ts`](./index.ts)
+- Tools: real executable capability registered in [`index.ts`](./index.ts) for OpenClaw
 
 ## Detailed spec
 
@@ -46,7 +46,7 @@ barry-video/
 2. `package.json` exposes the package as an installable OpenClaw extension.
 3. `index.ts` registers tool-use actions that shell into the working backend at `inbeidou_cli.py`.
 4. `skills/` tells the model when to use which tool based on natural language.
-5. `scripts/install-local.sh` installs the package into `~/.openclaw`, prefers copying a local backend snapshot when available, and otherwise falls back to the bundled backend shipped inside the npm package.
+5. `scripts/install-local.sh` installs the package into `~/.openclaw`, syncs bundled skills into `~/.codex/skills` and `~/.claude/skills`, prefers copying a local backend snapshot when available, and otherwise falls back to the bundled backend shipped inside the npm package.
 
 ## Local install
 
@@ -63,7 +63,9 @@ npx -y barry-video install
 
 By default, install now does this in one flow:
 
-- Installs the plugin and skills into `~/.openclaw`
+- Installs the OpenClaw plugin and skills into `~/.openclaw`
+- Installs the same skills into `~/.codex/skills`
+- Installs the same skills into `~/.claude/skills`
 - Writes Barry Video plugin config
 - If no token is already configured, automatically prints the official WeChat login QR directly in the terminal
 - Waits for scan confirmation, then saves the token
@@ -75,6 +77,7 @@ export BARRY_VIDEO_BACKEND="$HOME/inbeidou_cli.py"
 export INBEIDOU_TOKEN="your-token"
 export BARRY_VIDEO_DEFAULT_ACCOUNT_IDS="109,108"
 export BARRY_VIDEO_DEFAULT_PUBLISH_PLATFORM="FACEBOOK"
+export CODEX_HOME="$HOME/.codex"
 ```
 
 If you are installing on a different runtime user or machine, set `INBEIDOU_TOKEN` or `BARRY_VIDEO_AUTH_TOKEN` so the bundled backend can authenticate without depending on a local hardcoded script.

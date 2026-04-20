@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 OPENCLAW_HOME="${OPENCLAW_HOME:-$HOME/.openclaw}"
 EXTENSIONS_DIR="$OPENCLAW_HOME/extensions"
 SKILLS_DIR="$OPENCLAW_HOME/skills"
+CODEX_SKILLS_DIR="${CODEX_HOME:-$HOME/.codex}/skills"
 CLAUDE_SKILLS_DIR="${CLAUDE_HOME:-$HOME/.claude}/skills"
 PLUGIN_DIR="$EXTENSIONS_DIR/barry-video"
 PLUGIN_BACKEND_DIR="$PLUGIN_DIR/backend"
@@ -75,7 +76,7 @@ for candidate in "${BARRY_VIDEO_BACKEND:-}" "$HOME/inbeidou_cli.py" "/Users/ming
   fi
 done
 
-mkdir -p "$EXTENSIONS_DIR" "$SKILLS_DIR"
+mkdir -p "$EXTENSIONS_DIR" "$SKILLS_DIR" "$CODEX_SKILLS_DIR" "$CLAUDE_SKILLS_DIR"
 
 rsync -a --delete \
   --exclude '.git/' \
@@ -101,12 +102,13 @@ else
   fi
 fi
 
-mkdir -p "$CLAUDE_SKILLS_DIR"
 for skill_path in "$ROOT_DIR"/skills/*; do
   [ -d "$skill_path" ] || continue
   skill_name="$(basename "$skill_path")"
   rm -rf "$SKILLS_DIR/$skill_name"
   cp -R "$skill_path" "$SKILLS_DIR/$skill_name"
+  rm -rf "$CODEX_SKILLS_DIR/$skill_name"
+  cp -R "$skill_path" "$CODEX_SKILLS_DIR/$skill_name"
   rm -rf "$CLAUDE_SKILLS_DIR/$skill_name"
   cp -R "$skill_path" "$CLAUDE_SKILLS_DIR/$skill_name"
 done
@@ -181,6 +183,7 @@ PY
 
 echo "Installed Barry Video plugin into: $PLUGIN_DIR"
 echo "Installed Barry Video skills into: $SKILLS_DIR"
+echo "Installed Barry Video skills into: $CODEX_SKILLS_DIR (Codex)"
 echo "Installed Barry Video skills into: $CLAUDE_SKILLS_DIR (Claude Code)"
 echo "Updated OpenClaw config: $CONFIG_FILE"
 if [ -f "$PLUGIN_BACKEND" ]; then
