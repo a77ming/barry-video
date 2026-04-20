@@ -1,6 +1,6 @@
 {
   "name": "barry-video",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Barry Video OpenClaw plugin for all Inbeidou creator workflows: account, credits, dramas, media, AI editing, and publishing.",
   "type": "module",
   "main": "./index.ts",
