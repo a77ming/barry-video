@@ -22,13 +22,13 @@ fi
 PYTHON_BIN="${BARRY_VIDEO_PYTHON:-python3}"
 
 read_saved_auth_token() {
-  "$PYTHON_BIN" - "$OPENCLAW_HOME" "$HOME/.barry-video/auth.json" <<'PY'
+  "$PYTHON_BIN" - "$HOME/.barry-video/auth_state.json" "$OPENCLAW_HOME" <<'PY'
 import json
 import pathlib
 import sys
 
-openclaw_home = pathlib.Path(sys.argv[1]).expanduser()
-auth_file = pathlib.Path(sys.argv[2]).expanduser()
+auth_state_file = pathlib.Path(sys.argv[1]).expanduser()
+openclaw_home = pathlib.Path(sys.argv[2]).expanduser()
 
 def read_json(path):
     try:
@@ -36,8 +36,8 @@ def read_json(path):
     except Exception:
         return {}
 
-auth_payload = read_json(auth_file)
-token = auth_payload.get("authToken") or auth_payload.get("token") or ""
+auth_state = read_json(auth_state_file)
+token = auth_state.get("access_token") or ""
 if token:
     print(token)
     raise SystemExit(0)
@@ -58,8 +58,7 @@ PY
 usage() {
   cat <<'EOF'
 Usage:
-  barry-video install [--no-login] [--no-open] [--timeout-ms 300000]
-  barry-video login [--no-open] [--timeout-ms 300000]
+  barry-video install
   barry-video logout
   barry-video status
   barry-video backend <inbeidou_cli.py args...>
@@ -75,7 +74,7 @@ case "$COMMAND" in
     shift
     exec "$ROOT_DIR/scripts/install-local.sh" "$@"
     ;;
-  login|logout|status)
+  logout|status)
     exec node "$ROOT_DIR/scripts/auth-cli.mjs" "$COMMAND" "${@:2}"
     ;;
   backend)

@@ -57,7 +57,7 @@ Read the resolved `auth_state.json` and report:
 - whether `access_token` exists
 - whether the token appears expired
 - `status`
-- `expired_at`
+- `expired_at` as a Unix timestamp in milliseconds
 - `agent_id`
 - `authorize_time`
 - `updated_at`
@@ -113,6 +113,8 @@ Expected JSON shape:
 }
 ```
 
+`expired_at` is a Unix timestamp in milliseconds.
+
 Treat the cache as unusable when:
 
 - the file does not exist
@@ -148,15 +150,21 @@ Infer these fields:
 Rules:
 
 - Prefer system parameters over generic project inference
+- `client_id` is required for `POST /v1/claw/auth/authorize`
 - `client_id` must be a unique identifier for the actual agent in use
 - The uniqueness requirement applies to agents including but not limited to `openclaw`, Feishu agents, DingTalk agents, `hermes`, and similar agent families
 - Never use a vague shared value for `client_id` if it cannot uniquely identify the current agent instance or agent identity
 - If the system already exposes a stable unique agent identifier, use that directly for `client_id`
+- If repeated authorization requests come from the same agent identity, keep using the same `client_id`
+- Do not generate a new random or time-varying `client_id` for the same agent on each authorization attempt
+- If the local auth cache already contains a previously successful `request_payload.client_id` for the same agent identity, reuse that value unless the real agent identity has changed
 - If the client is `openclaw`, use the `openclaw` identity and metadata
 - If the client is a Feishu-series agent, use that Feishu agent's identity and metadata
 - If the client is a DingTalk-series agent, use that DingTalk agent's identity and metadata
 - If the client is `hermes`, use the `hermes` identity and metadata
 - Use project context for `version` or `model` only when system parameters do not already provide them
+- Do not call `POST /v1/claw/auth/authorize` with an empty `client_id`
+- If a reliable `client_id` cannot be resolved, stop and report that authorization creation is blocked
 - Do not ask the user to hand-fill these values unless the flow is truly blocked
 
 Fallback defaults:
@@ -231,7 +239,7 @@ Treat `reject` or `fail` as terminal failure if the backend returns them.
 When polling reaches `status=success`:
 
 - save `access_token` immediately
-- save `expired_at` immediately
+- save `expired_at` immediately as the backend-returned Unix millisecond timestamp
 - save `code`, `agent_id`, `authorize_time`, and `request_payload`
 - overwrite the resolved cache file atomically
 
@@ -284,7 +292,7 @@ For `/beidou-auth` or a refresh flow, return:
 - `poll_interval`
 - `poll_timeout`
 - `access_token`
-- `expired_at`
+- `expired_at` as a Unix timestamp in milliseconds
 - `agent_id` when present
 - `authorize_time` when present
 - `updated_at` when present
@@ -298,7 +306,7 @@ For `/beidou-auth status`, return:
 - `status`
 - `token_present`
 - `token_expired`
-- `expired_at`
+- `expired_at` as a Unix timestamp in milliseconds
 - `agent_id` when present
 - `authorize_time` when present
 - `updated_at` when present
