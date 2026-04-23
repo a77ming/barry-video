@@ -454,9 +454,11 @@ function buildDramaDetailArgs(api, params = {}) {
   addOption(args, "--size", params.size);
   addOption(args, "--order", params.order || defaults.defaultDramaOrder);
   addOption(args, "--task-type", params.taskType);
+  addOption(args, "--episode-order", params.episodeOrder);
   addRepeatedOptions(args, "--promote-platform", params.promotionPlatforms);
   addFlag(args, params.allPromotionPlatforms, "--all-promote-platforms");
   addFlag(args, params.noPromotionLinks, "--no-promotion-links");
+  addFlag(args, params.noEpisodeInfo, "--no-episode-info");
   args.push("--json");
   return args;
 }
@@ -561,7 +563,7 @@ function registerBarryTools(api) {
     api,
     {
       name: "barry_video_drama_detail",
-      description: "Get short drama detail and promotion links from the task detail flow.",
+      description: "Get short drama detail, normalized cover URL, online episode video URL, and promotion links from the task detail flow.",
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -573,12 +575,14 @@ function registerBarryTools(api) {
           size: { type: "integer" },
           order: { type: "string" },
           taskType: { type: "string" },
+          episodeOrder: { type: "integer" },
           promotionPlatforms: {
             type: "array",
             items: { type: "string", enum: ["1", "2", "3", "4", "TikTok", "Facebook", "Instagram", "YouTube"] }
           },
           allPromotionPlatforms: { type: "boolean" },
-          noPromotionLinks: { type: "boolean" }
+          noPromotionLinks: { type: "boolean" },
+          noEpisodeInfo: { type: "boolean" }
         }
       }
     },

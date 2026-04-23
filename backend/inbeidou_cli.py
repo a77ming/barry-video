@@ -21,11 +21,13 @@ import argparse
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 from websocket import create_connection
@@ -42,6 +44,7 @@ DEFAULT_POLL_INTERVAL = 3
 DEFAULT_TASK_TIMEOUT = 1800
 STATE_FILE = Path.home() / ".inbeidou_cli_state.json"
 AUTH_STATE_FILE = Path.home() / ".barry-video" / "auth_state.json"
+DEFAULT_DRAMA_ASSET_BASE_URL = "https://play.inbeidou.cn"
 
 PLATFORMS = {
     "dramabox": "DramaBox",
@@ -370,6 +373,76 @@ def build_promotion_link_entry(platform_id, payload):
     }
 
 
+def normalize_asset_url(value):
+    if not isinstance(value, str) or not value:
+        return ""
+    if value.startswith(("http://", "https://")):
+        return value
+    if value.startswith("/"):
+        return f"{DEFAULT_DRAMA_ASSET_BASE_URL}{value}"
+    return value
+
+
+def iter_nested_items(value, path=""):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            next_path = f"{path}.{key}" if path else str(key)
+            yield next_path, item
+            yield from iter_nested_items(item, next_path)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            next_path = f"{path}[{index}]"
+            yield next_path, item
+            yield from iter_nested_items(item, next_path)
+
+
+def collect_urls(value):
+    urls = []
+    for path, item in iter_nested_items(value):
+        if not isinstance(item, str):
+            continue
+        for match in re.findall(r"https?://[^\s\"'<>，。)）]+", item):
+            urls.append({"path": path, "url": match.rstrip(".,")})
+    return urls
+
+
+def pick_url(value, key_hints, extensions):
+    candidates = collect_urls(value)
+    scored = []
+    for candidate in candidates:
+        url = candidate["url"]
+        parsed_path = urlparse(url).path.lower()
+        path = candidate["path"].lower()
+        score = 0
+        if any(hint in path for hint in key_hints):
+            score += 10
+        if any(parsed_path.endswith(ext) for ext in extensions):
+            score += 5
+        if score:
+            scored.append((score, candidate))
+    if not scored:
+        return ""
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return scored[0][1]["url"]
+
+
+def pick_cover_url(item):
+    for key in ("third_cover", "cover_url", "cover", "poster", "poster_url", "image", "image_url"):
+        value = item.get(key) if isinstance(item, dict) else None
+        normalized = normalize_asset_url(value)
+        if normalized:
+            return normalized
+    return pick_url(item, ["cover", "poster", "image", "thumb"], [".jpg", ".jpeg", ".png", ".webp"])
+
+
+def pick_video_url(item):
+    for key in ("play_url", "video_url", "media_url", "preview_url", "trailer_url", "url"):
+        value = item.get(key) if isinstance(item, dict) else None
+        if isinstance(value, str) and value.startswith(("http://", "https://")):
+            return value
+    return pick_url(item, ["video", "media", "preview", "trailer", "play", "playlist"], [".mp4", ".mov", ".m4v", ".webm"])
+
+
 def probe_video(file_path):
     """用 ffprobe 读取上传所需的视频元数据。"""
     path = Path(file_path).expanduser().resolve()
@@ -480,6 +553,19 @@ def get_task_info(task_id, app_id="", task_type="1"):
     if task_type:
         params["task_type"] = task_type
     return api_request(SCENTER_API, "/task/info", params=params, auth_style="bearer")
+
+
+def get_episode_info(serial_id, episode_order=1, app_id="", task_type="1", need_play=1):
+    params = {
+        "serial_id": serial_id,
+        "episode_order": episode_order,
+        "need_play": need_play,
+    }
+    if app_id:
+        params["app_id"] = app_id
+    if task_type:
+        params["task_type"] = task_type
+    return api_request(SCENTER_API, "/episode/info", params=params, auth_style="bearer")
 
 
 def receive_task(task_id, task_type="1", platform=2):
@@ -1064,12 +1150,13 @@ def build_translate_params(args):
 
 def submit_ws_tasks(window_id, upload_ids, tasks, merge_video=False, timeout=90):
     """通过前端同款 websocket 提交智能任务。"""
+    token = load_auth_token()
     payload = {
         "question": "",
         "upload_ids": [int(upload_id) for upload_id in upload_ids],
         "window_id": int(window_id),
         "msg_type": "card",
-        "token": TOKEN,
+        "token": token,
         "merge_video": bool(merge_video),
         "tasks": tasks,
     }
@@ -1400,6 +1487,24 @@ def cmd_list(args):
 
 def cmd_detail(args):
     item = resolve_task_for_detail(args)
+    cover_url = pick_cover_url(item)
+    episode_info = {}
+    online_video_url = pick_video_url(item)
+
+    if not args.no_episode_info and item.get("serial_id"):
+        episode_body = require_success(
+            get_episode_info(
+                serial_id=item["serial_id"],
+                episode_order=args.episode_order,
+                app_id=item.get("app_id") or args.platform,
+                task_type=item.get("task_type", args.task_type),
+                need_play=1,
+            ),
+            "获取短剧分集在线视频",
+        )
+        episode_info = episode_body or {}
+        online_video_url = pick_video_url(episode_info) or online_video_url
+
     promotion_links = []
     if not args.no_promotion_links:
         for platform_id in normalize_promotion_platforms(args.promote_platforms, include_all=args.all_promote_platforms):
@@ -1411,6 +1516,10 @@ def cmd_detail(args):
 
     result = {
         **item,
+        "cover_url": cover_url,
+        "episode_order": args.episode_order,
+        "episode_info": episode_info,
+        "online_video_url": online_video_url,
         "promotion_links": promotion_links,
     }
 
@@ -1421,6 +1530,8 @@ def cmd_detail(args):
     format_drama(item)
     print(f"   serial_id: {item.get('serial_id', 'N/A')}")
     print(f"   third_serial_id: {item.get('third_serial_id', 'N/A')}")
+    print(f"   cover_url: {cover_url or 'N/A'}")
+    print(f"   第{args.episode_order}集在线视频: {online_video_url or 'N/A'}")
     print("   简介:")
     print(f"   {item.get('description', '') or 'N/A'}")
 
@@ -1901,6 +2012,8 @@ def build_parser():
     detail_parser.add_argument("--size", type=int, default=10, help="搜索候选数量")
     detail_parser.add_argument("--order", type=str, default="publish_at", help="搜索排序字段")
     detail_parser.add_argument("--task-type", type=str, default="1", help="任务类型")
+    detail_parser.add_argument("--episode-order", type=int, default=1, help="拉取第几集的在线视频 URL")
+    detail_parser.add_argument("--no-episode-info", action="store_true", help="不拉取分集在线视频信息")
     detail_parser.add_argument(
         "--promote-platform",
         dest="promote_platforms",

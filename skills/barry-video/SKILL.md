@@ -31,7 +31,7 @@ Use it when the user speaks naturally, for example:
 
 1. If the user asks a factual account question such as balance, products, or profile, call the matching account tool directly.
 2. If the user asks for a latest drama, call `barry_video_dramas` with platform `dramabox` unless another platform is specified.
-3. If the user asks for a task detail page, promotion links, app link, serial link, or a drama's推广口令, call `barry_video_drama_detail`.
+3. If the user asks for a task detail page, 查剧/找剧详情, cover URL, online episode video URL, promotion links, app link, serial link, or a drama's推广口令, call `barry_video_drama_detail`.
 4. If the user asks to analyze, clip, or translate a local file, pass `file` directly to the AI media tool instead of forcing a separate upload step.
 5. If the user asks to publish and there is no known account or team ID, call `barry_video_publish_accounts` first.
 6. If the user asks for clip then publish in one sentence, prefer `barry_video_pipeline`.
